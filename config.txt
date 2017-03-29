@@ -1,0 +1,12 @@
+debug=1
+recomp_T=500
+use_swap=1
+use_reverse=1
+use_insert=1
+max_rev=30
+max_ins=30
+init_T=1
+last_T=0.0002
+K=0.3
+iterations=110
+seed=60
