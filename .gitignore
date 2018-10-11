@@ -27,3 +27,5 @@
 *.exe
 *.out
 *.app
+/kiwi.vcxproj.user
+/.vs
