@@ -22,7 +22,7 @@ public:
 		m_path.resize(cities + 1);
 
 		// Fill with the increasing sequence and set the first and last city.
-		std::iota(m_path.begin(), m_path.end(), 0);
+		std::iota(m_path.begin(), m_path.end(), std::uint16_t(0));
 		m_path[0] = m_path[cities] = start_city;
 		m_path[start_city] = 0;
 

@@ -168,6 +168,7 @@
     <ClInclude Include="csv.h" />
     <ClInclude Include="matrix.h" />
     <ClInclude Include="path.h" />
+    <ClInclude Include="random.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

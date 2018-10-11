@@ -11,7 +11,6 @@
 #include <cstdio>
 #include <iostream>
 #include <memory>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -20,14 +19,15 @@
 #include "csv.h"
 #include "matrix.h"
 #include "path.h"
+#include "random.h"
 
 
 // Simulation of: /usr/bin/timeout --signal=SIGTERM --kill-after=1s 30s /app/run < data_300.txt
-//std::thread timeout([]
-//{
-//	std::this_thread::sleep_for(std::chrono::seconds(30));
-//	std::raise(SIGTERM);
-//});
+std::thread timeout([]
+{
+	std::this_thread::sleep_for(std::chrono::seconds(30));
+	std::raise(SIGTERM);
+});
 
 //// Global config data.
 //config g_config;
@@ -39,68 +39,6 @@ void signal_handler(int signum)
 	if (signum == SIGTERM)
 		g_continue_run = false;
 }
-
-//
-//class xorshift
-//{
-//public:
-//	typedef std::uint64_t result_type;
-//
-//	xorshift(std::uint32_t seed)
-//		: m_state(seed + 249863319)
-//		, m_state1(seed + 2498633199)
-//	{
-//	}
-//
-//	xorshift(xorshift &&) = default;
-//	xorshift & operator=(xorshift &&) = default;
-//
-//	xorshift(xorshift &) = default;
-//	xorshift & operator=(xorshift &) = default;
-//
-//	result_type operator()()
-//	{
-//		// varianta 1 z wiki
-//		//std::uint32_t x = m_state;
-//		//x ^= x << 13;
-//		//x ^= x >> 17;
-//		//x ^= x << 5;
-//		//m_state = x;
-//		//return x;
-//
-//		// varianta 2 z wiki
-//		//uint64_t x = m_state;
-//		//x ^= x >> 12; // a
-//		//x ^= x << 25; // b
-//		//x ^= x >> 27; // c
-//		//m_state = x;
-//		//return x * 0x2545F4914F6CDD1D;
-//
-//		// varianta 3 z wiki
-//		std::uint64_t x = m_state;
-//		std::uint64_t const y = m_state1;
-//		m_state = y;
-//		x ^= x << 23; // a
-//		m_state1 = x ^ y ^ (x >> 17) ^ (y >> 26); // b, c
-//		return m_state1 + y;
-//	}
-//
-//	static result_type min() noexcept
-//	{
-//		return 0;
-//	}
-//
-//	static result_type max() noexcept
-//	{
-//		return std::numeric_limits<result_type>::max();
-//	}
-//
-//private:
-//	std::uint64_t m_state;
-//	std::uint64_t m_state1;
-//};
-
-
 
 enum method_t
 {
@@ -120,8 +58,7 @@ inline double get_last_t(std::size_t cities)
 	return 0.0005;
 }
 
-path_t solver(path_t path, std::mt19937 rng, path_t * result)
-//path_t solver(path_t path, xorshift rng, path_t * result)
+path_t solver(path_t path, rnd_gen_t rng)
 {
 	auto min_path = path;
 	auto min_cost = path.cost();
@@ -219,45 +156,8 @@ path_t solver(path_t path, std::mt19937 rng, path_t * result)
 		}
 	}
 
-	*result = min_path;
 	return min_path;
 }
-
-
-class task
-{
-public:
-	task(unsigned int idx, int cities, std::uint16_t start_city)
-		: m_idx(idx)
-		, m_rng(idx + 60 /*g_config.seed*/)
-		, m_path(cities, start_city)
-	{
-	}
-
-	void start()
-	{
-		m_worker = std::thread(solver, m_path, m_rng, &m_path);
-	}
-
-	void wait()
-	{
-		if (m_worker.joinable())
-			m_worker.join();
-	}
-
-	const path_t * get_path_ptr() const
-	{
-		return & m_path;
-	}
-
-private:
-	unsigned int m_idx;
-	std::thread  m_worker;
-	std::mt19937 m_rng;
-	//xorshift     m_rng;
-	path_t       m_path;
-};
-
 
 int main()
 {
@@ -288,47 +188,19 @@ int main()
 		costs_matrix.set(idx_src, idx_dst, day, price);
 	}
 
-	//// Create random generator.
-	//std::mt19937 rng;
+	// Create random generator.
+	rnd_gen_t rng;
 
-	//// Generate the path between N cities.
-	//path_t init_path(cities.count(), start_city);
+	// Generate the path between N cities.
+	path_t init_path(cities.count(), start_city);
 
-	//// Optimize the path.
-	//auto path = solver(init_path, rng);
+	// Optimize the path.
+	auto path = solver(init_path, rng);
 
-	//// Print the path and the cost.
-	//path.print(std::cout, cities);
+	// Print the path and the cost.
+	path.print(std::cout, cities);
 
-	const int TASKS_NUM = 4;
-
-	task * tasks[TASKS_NUM];
-	for (unsigned int i = 0; i < TASKS_NUM; ++i)
-	{
-		tasks[i] = new task(i, (int)cities.count(), start_city);
-		tasks[i]->start();
-
-		//std::cout << "poustim: " << i << std::endl;
-	}
-
-	for (int i = 0; i < TASKS_NUM; ++i)
-	{
-		tasks[i]->wait();
-
-		//std::cout << "koncim: " << i << std::endl;
-		//std::cout << "cena:   " << tasks[i]->get_path_ptr()->cost() << std::endl;
-	}
-
-	const path_t * final_path = tasks[0]->get_path_ptr();
-	for (int i = 1; i < TASKS_NUM; ++i)
-	{
-		if (tasks[i]->get_path_ptr()->cost() < final_path->cost())
-			final_path = tasks[i]->get_path_ptr();
-	}
-
-	final_path->print(std::cout, cities);
-
-//	timeout.join();
+	timeout.join();
     return 0;
 }
 
