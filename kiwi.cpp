@@ -5,6 +5,7 @@
  */
 
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <csignal>
 #include <cstdint>
@@ -14,40 +15,39 @@
 #include <string>
 #include <vector>
 
+#include "area.h"
 #include "city.h"
 #include "config.h"
 #include "csv.h"
 #include "matrix.h"
+#include "parser.h"
 #include "path.h"
 #include "random.h"
 
 
 // Simulation of: /usr/bin/timeout --signal=SIGTERM --kill-after=1s 30s /app/run < data_300.txt
-std::thread timeout([]
-{
-	std::this_thread::sleep_for(std::chrono::seconds(30));
-	std::raise(SIGTERM);
-});
+//static std::thread timeout([]
+//{
+//	std::this_thread::sleep_for(std::chrono::seconds(30));
+//	std::raise(SIGTERM);
+//});
+
+
 
 //// Global config data.
 //config g_config;
-matrix<std::uint16_t> path_t::s_costs(300);
-std::atomic<bool> g_continue_run(true);
+static std::atomic<bool> g_continue_run(true);
 
-void signal_handler(int signum)
+static void signal_handler(int signum)
 {
 	if (signum == SIGTERM)
 		g_continue_run = false;
 }
 
-enum method_t
-{
-	SWAP,
-	REVERSE,
-	INSERT
-};
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
-inline double get_last_t(std::size_t cities)
+static inline double get_last_t(std::size_t cities)
 {
 	if (cities < 55)
 		return 0.005;
@@ -58,8 +58,10 @@ inline double get_last_t(std::size_t cities)
 	return 0.0005;
 }
 
-path_t solver(path_t path, rnd_gen_t rng)
+static path_t solver(path_t path)
 {
+    rnd_gen_t rng;
+
 	auto min_path = path;
 	auto min_cost = path.cost();
 
@@ -90,7 +92,7 @@ path_t solver(path_t path, rnd_gen_t rng)
 		auto j = gen_idx(rng);
 
 		// Compute the best price.
-		method_t method;
+        enum method_t { SWAP, REVERSE, INSERT } method;
 		auto cost_diff = std::numeric_limits<std::int32_t>::max();
 
 		//if (g_config.use_swap)
@@ -159,48 +161,95 @@ path_t solver(path_t path, rnd_gen_t rng)
 	return min_path;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+static std::vector<std::uint16_t> cities_names_to_cities_idx(const char * city_names, cities_map_t & cities_indexer)
+{
+    // There must be at least one city.
+    int count = 1;
+    auto begin = city_names;
+
+    // Just an alloc optimization.
+    while (city_names[3] == ' ')
+    {
+        ++count;
+        city_names += 4;
+    }
+
+    std::vector<std::uint16_t> ret;
+    ret.reserve(count);
+
+    // Add the cities.
+    city_names = begin;
+    for (int i = 0; i < count; ++i)
+    {
+        auto idx = cities_indexer.get_city_index(city_t(city_names));
+        ret.push_back(idx);
+        city_names += 4;
+    }
+    return ret;
+}
+
+static void parse_input_data(cities_map_t & cities_indexer, areas_map_t & areas_indexer, matrix<std::uint16_t> & costs_matrix)
+{
+    parser_t parser;
+
+    // Read number of locations and start city.
+    std::uint16_t areas_count;
+    char * tmp_str;
+    parser.parse_row(areas_count, tmp_str);
+
+    auto idx_start = cities_indexer.get_city_index(city_t(tmp_str));
+
+    // Load areas.
+    areas_indexer.reserve(areas_count);
+    for (int i = 0; i < areas_count; ++i)
+    {
+        auto area = area_t(parser.read_line());
+        areas_indexer.add_area(area);
+        area.add_cities(cities_names_to_cities_idx(parser.read_line(), cities_indexer));
+    }
+
+    // Save all flights to the matrix.
+    char * from, * to;
+    std::uint16_t day, price;
+
+    while (parser.parse_row(from, to, day, price))
+    {
+        auto idx_src = cities_indexer.get_city_index(city_t(from));
+        auto idx_dst = cities_indexer.get_city_index(city_t(to));
+
+        costs_matrix.set(idx_src, idx_dst, day, price);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 int main()
 {
 	// Set SIGTERM handler.
 	std::signal(SIGTERM, signal_handler);
 
-	// Helper variables for line parsing.
-	char * from, * to;
-	std::uint16_t day, price;
+	// Create the holders of cities and areas [name <-> index] and price matrix.
+	cities_map_t cities_indexer;
+    areas_map_t  areas_indexer;
+    matrix<std::uint16_t> costs_matrix(300);
 
-	// Create the holder of cities map [name <-> index].
-	cities_map cities;
-
-	// Create the stdin data reader.
-	io::CSVReader<4, io::trim_chars<>, io::no_quote_escape<' '>> in("x:\\kiwi\\data_300.txt", stdin);
-
-	// Save the start/end city.
-	in.read_row(from, to, day, price);
-	auto start_city = cities.get_city_index(from);
-
-	// Save all flights to the matrix.
-	matrix<std::uint16_t> & costs_matrix = path_t::s_costs;
-	while (in.read_row(from, to, day, price))
-	{
-		auto idx_src = cities.get_city_index(from);
-		auto idx_dst = cities.get_city_index(to);
-
-		costs_matrix.set(idx_src, idx_dst, day, price);
-	}
-
-	// Create random generator.
-	rnd_gen_t rng;
+    parse_input_data(cities_indexer, areas_indexer, costs_matrix);
 
 	// Generate the path between N cities.
-	path_t init_path(cities.count(), start_city);
+    std::uint16_t start_city = 0; // temporary
+	path_t init_path(cities_indexer.count(), start_city);
 
 	// Optimize the path.
-	auto path = solver(init_path, rng);
+	auto path = solver(init_path);
 
 	// Print the path and the cost.
-	path.print(std::cout, cities);
+	path.print(std::cout, cities_indexer);
 
-	timeout.join();
+//	timeout.join();
     return 0;
 }
 

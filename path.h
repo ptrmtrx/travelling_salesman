@@ -188,7 +188,7 @@ public:
 			std::rotate(beg + j, beg + i, beg + i + 1);
 	}
 
-	void print(std::ostream & out, const cities_map & map) const
+	void print(std::ostream & out, const cities_map_t & map) const
 	{
 		// Print the cost.
 		out << cost() << std::endl;
