@@ -38,17 +38,10 @@ public:
  	    return m_state[1] + y;
     }
  
-    static result_type min() noexcept
-    {
- 	    return 0;
-    }
+    static result_type min() noexcept { return 0; }
+    static result_type max() noexcept { return std::numeric_limits<result_type>::max(); }
  
-    static result_type max() noexcept
-    {
- 	    return std::numeric_limits<result_type>::max();
-    }
- 
-   private:
+private:
     std::uint64_t m_state[2];
 };
 
@@ -83,15 +76,8 @@ public:
         return result;
     }
 
-    static result_type min() noexcept
-    {
-        return 0;
-    }
-
-    static result_type max() noexcept
-    {
-        return std::numeric_limits<result_type>::max();
-    }
+    static result_type min() noexcept { return 0;}
+    static result_type max() noexcept { return std::numeric_limits<result_type>::max(); }
 
 private:
     static inline std::uint64_t rotl(std::uint64_t x, int k)

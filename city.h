@@ -8,29 +8,26 @@
 
 #include <cassert>
 #include <cstdint>
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
 
 
-class city
+class city_t
 {
 public:
-	city(const char * str)
+	explicit constexpr city_t(const char * str)
+        : m_code{str[0], str[1], str[2]}
 	{
-		m_code[0] = str[0];
-		m_code[1] = str[1];
-		m_code[2] = str[2];
-		//m_code[3] = 0;
 	}
 
-	bool operator<(const city & other) const
+	constexpr bool operator<(const city_t & other) const
 	{
 		return m_code[0] < other.m_code[0]
 			|| m_code[1] < other.m_code[1]
 			|| m_code[2] < other.m_code[2];
 	}
 
-	bool operator==(const city & other) const
+	constexpr bool operator==(const city_t & other) const
 	{
 		return m_code[0] == other.m_code[0]
 			&& m_code[1] == other.m_code[1]
@@ -39,14 +36,14 @@ public:
 		//return std::equal(m_code, m_code + sizeof(m_code), other.m_code);
 	}
 
-	std::size_t hash() const
+	constexpr std::size_t hash() const
 	{
 		return m_code[0]
 			+ (m_code[1] << 8)
 			+ (m_code[2] << 16);
 	}
 
-	friend std::ostream & operator<<(std::ostream & out, const city & rec)
+	friend std::ostream & operator<<(std::ostream & out, const city_t & rec)
 	{
 		out << rec.m_code[0] << rec.m_code[1] << rec.m_code[2];
 		return out;
@@ -59,22 +56,22 @@ private:
 
 struct city_hasher
 {
-	std::size_t operator()(const city & c) const
+	std::size_t operator()(const city_t & c) const
 	{
 		return c.hash();
 	}
 };
 
 
-class cities_map
+class cities_map_t
 {
 public:
-	cities_map()
+	cities_map_t()
 	{
 		m_map.reserve(300);
 	}
 
-	std::uint16_t get_city_index(const city & city)
+	std::uint16_t get_city_index(const city_t & city)
 	{
 		if (m_map.find(city) != m_map.end())
 			return m_map[city];
@@ -82,7 +79,7 @@ public:
 		return m_map[city] = m_last_idx++;
 	}
 
-	city get_city_object(std::uint16_t idx) const
+    city_t get_city_object(std::uint16_t idx) const
 	{
 		for (const auto & pair : m_map)
 		{
@@ -99,6 +96,22 @@ public:
 	}
 
 private:
-	std::unordered_map<city, std::uint16_t, city_hasher> m_map;
+	std::unordered_map<city_t, std::uint16_t, city_hasher> m_map;
 	std::uint16_t m_last_idx = 0;
 };
+
+//class cities_map_t
+//{
+//public:
+//    cities_map_t()
+//    {
+//    }
+//
+//    std::uint16_t get_city_index(const city_t & city)
+//    {
+//    }
+//
+//    city_t get_city_object(std::uint16_t idx) const
+//    {
+//    }
+//};

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -21,7 +22,8 @@ public:
 		, m_matrix(new T[m_length])
 		, m_max(std::numeric_limits<T>::min())
 	{
-		std::fill_n(m_matrix, m_length, /*49'819*/std::numeric_limits<T>::max());
+        assert(dim * dim * dim < std::numeric_limits<decltype(m_dim)>::max());
+		std::fill_n(m_matrix, m_length, std::numeric_limits<T>::max());
 	}
 
 	matrix(const matrix<T> &) = delete;
