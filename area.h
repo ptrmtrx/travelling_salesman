@@ -43,5 +43,20 @@ public:
 
     void reserve(std::uint16_t count)
     {
+        (void)count;
     }
+
+    // Returns index of added area.
+    std::uint16_t add_area(area_t && area)
+    {
+        (void)area;
+        return 0;
+    }
+
+    std::size_t count() const
+    {
+        return 0;//m_map.size();
+    }
+private:
+
 };

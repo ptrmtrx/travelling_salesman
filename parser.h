@@ -8,75 +8,18 @@
 
 #include <cstdio>
 
-class stdin_reader_t
-{
-public:
-    stdin_reader_t()
-    {
-        // Disable buffering and replace it by own one.
-        std::setvbuf(stdin, 0, _IONBF, 0);
-    }
-
-    std::size_t read(char * buffer, int size)
-    {
-        return std::fread(buffer, 1, size, stdin);
-    }
-};
-
-#define READ_CHAR _fgetc_nolock(stdin)
-
-static std::uint16_t read_uint16()
-{
-    std::uint16_t num = 0;
-
-    auto c = READ_CHAR;
-    while (c >= '0' && c <= '9')
-    {
-        num = 10 * num + (c - '0');
-        c = READ_CHAR;
-    }
-
-    return num;
-}
-
-static void read_str(char * str)
-{
-    int i = 0;
-    auto c = READ_CHAR;
-    while (!std::isspace(c))
-    {
-        str[i++] = c;
-        c = READ_CHAR;
-    }
-    str[i] = 0;
-}
-
-class SynchronousReader
-{
-public:
-    void start_read(char * arg_buffer, int arg_desired_byte_count)
-    {
-        buffer = arg_buffer;
-        desired_byte_count = arg_desired_byte_count;
-    }
-
-    int finish_read()
-    {
-        return std::fread(buffer, 1, desired_byte_count, stdin);
-    }
-private:
-    char * buffer;
-    int desired_byte_count;
-};
-
 
 class line_reader_t
 {
 public:
-    line_reader_t() = default;
+    // Returns whole line from stdin, nullptr on EOF.
+    char * next_line()
+    {
+        return std::fgets(m_buffer, sizeof(m_buffer), stdin);
+    }
 
 private:
-
+    char m_buffer[2048];
 };
 
 
@@ -85,24 +28,58 @@ class parser_t
 public:
     parser_t() = default;
 
+    // Returns whole line, nullptr on EOF.
     char * read_line()
     {
         return m_input.next_line();
     }
 
-    template <class ... Columns>
-    bool parse_row(Columns& ... cols)
+    void parse_line(std::uint16_t & num, char *& str)
     {
-        auto line = m_input.next_line();
+        auto line = read_line();
+        read_uint16(line, num);
+        read_str(line, str);
+    }
+
+    bool parse_line(char *& from, char *& to, std::uint16_t & day, std::uint16_t & price)
+    {
+        auto line = read_line();
         if (!line)
             return false;
 
-        detail::parse_line<trim_policy>(line, row, col_order);
-        parse_helper(0, cols...);
-
+        read_str(line, from);
+        read_str(line, to);
+        read_uint16(line, day);
+        read_uint16(line, price);
         return true;
     }
 
 private:
+    static void read_str(char *& line, char *& str)
+    {
+        str = line;
+
+        int i = 0;
+        char c = *line++;
+        while (c != ' ' && c != '\n')
+        {
+            ++i;
+            c = *line++;
+        }
+        str[i] = '\0';
+    }
+
+    static void read_uint16(char *& line, std::uint16_t & num)
+    {
+        num = 0;
+
+        char c = *line++;
+        while (c != ' ' && c != '\n')
+        {
+            num = 10 * num + (c - '0');
+            c = *line++;
+        }
+    }
+
     line_reader_t m_input;
 };

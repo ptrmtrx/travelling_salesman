@@ -166,7 +166,6 @@
     <ClInclude Include="area.h" />
     <ClInclude Include="city.h" />
     <ClInclude Include="config.h" />
-    <ClInclude Include="csv.h" />
     <ClInclude Include="matrix.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="path.h" />
