@@ -138,15 +138,18 @@ int main()
         // Generate a random path.
         path_t path(cities_indexer.count(), &costs_matrix, /*start_city*/0);
 
-        // Optimize the path.
-        path.solver();
-
-        // Print the path and the cost.
+        // Print the optimized path and the cost.
+        path.optimize();
         path.print(std::cout, cities_indexer);
     }
     else
     {
+        // Generate a random path.
+        areapath_t path;
 
+        // Print the optimized path and the cost.
+        path.optimize();
+        path.print(std::cout, cities_indexer);
     }
 
     timeout.join();

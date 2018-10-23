@@ -171,6 +171,9 @@
     <ClInclude Include="path.h" />
     <ClInclude Include="random.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="ts.py" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
