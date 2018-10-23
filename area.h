@@ -14,26 +14,20 @@
 class area_t
 {
 public:
-    area_t(const char * name)
-        : m_name(name)
+    area_t(std::string && name, std::vector<std::uint16_t> && cities_idx)
+        : m_selected_city_pos{0}
+        , m_cities{std::move(cities_idx)}
+        , m_name{std::move(name)}
     {
     }
 
-    void add_city(std::uint16_t city_idx)
-    {
-        m_cities.push_back(city_idx);
-    }
-
-    void add_cities(std::vector<std::uint16_t> && cities_idx)
-    {
-        m_cities = std::move(cities_idx);
-    }
-
-    const std::string & get_name() const { return m_name; }
+    const std::string & get_name()    const noexcept { return m_name; }
+    std::uint16_t get_selected_city() const noexcept { return m_cities[m_selected_city_pos]; }
 
 private:
-    std::string m_name;
+    unsigned int m_selected_city_pos;
     std::vector<std::uint16_t> m_cities;
+    std::string m_name;
 };
 
 class areas_map_t

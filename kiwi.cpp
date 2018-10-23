@@ -88,16 +88,22 @@ static void parse_input_data(cities_map_t & cities_indexer, areas_map_t & areas_
     char * tmp_str;
     parser.parse_line(areas_count, tmp_str);
 
-    /*auto idx_start = */cities_indexer.get_city_index(city_t(tmp_str));
+    auto idx_start = cities_indexer.get_city_index(city_t(tmp_str));
 
     // Load areas.
     areas_indexer.reserve(areas_count);
     for (int i = 0; i < areas_count; ++i)
     {
-        auto area = area_t(parser.read_line());
-        area.add_cities(cities_names_to_cities_idx(parser.read_line(), cities_indexer));
+        auto area_name = std::string(parser.read_line());
+        auto cities = cities_names_to_cities_idx(parser.read_line(), cities_indexer);
 
-        /*auto area_idx =*/ areas_indexer.add_area(std::move(area));
+        // Check if the area contains start_city.
+        auto it = std::find(cities.cbegin(), cities.cend(), idx_start);
+        if (it != cities.cend())
+        {
+        }
+
+        /*auto area_idx =*/ areas_indexer.add_area(area_t(std::move(area_name), std::move(cities)));
     }
 
     // Save all flights to the matrix.
@@ -136,17 +142,20 @@ int main()
     if (areas_indexer.count() == cities_indexer.count())
     {
         // Generate a random path.
-        path_t path(cities_indexer.count(), &costs_matrix, /*start_city*/0);
+        path_t path(cities_indexer, costs_matrix, 0);
 
-        // Optimize the path.
-        path.solver();
-
-        // Print the path and the cost.
-        path.print(std::cout, cities_indexer);
+        // Print the optimized path and the cost.
+        path.optimize();
+        path.print(std::cout);
     }
     else
     {
+        // Generate a random path.
+        areapath_t path(areas_indexer, cities_indexer, costs_matrix, 0);
 
+        // Print the optimized path and the cost.
+        path.optimize();
+        path.print(std::cout);
     }
 
     timeout.join();
