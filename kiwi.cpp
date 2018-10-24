@@ -79,7 +79,7 @@ static std::vector<std::uint16_t> cities_names_to_cities_idx(const char * city_n
     return ret;
 }
 
-static void parse_input_data(cities_map_t & cities_indexer, areas_map_t & areas_indexer, matrix<std::uint16_t> & costs_matrix)
+static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> & areas_list, matrix<std::uint16_t> & costs_matrix)
 {
     parser_t parser;
 
@@ -88,22 +88,27 @@ static void parse_input_data(cities_map_t & cities_indexer, areas_map_t & areas_
     char * tmp_str;
     parser.parse_line(areas_count, tmp_str);
 
-    auto idx_start = cities_indexer.get_city_index(city_t(tmp_str));
+    /*auto idx_start = */cities_indexer.get_city_index(city_t(tmp_str));
 
     // Load areas.
-    areas_indexer.reserve(areas_count);
+    areas_list.clear();
+    areas_list.reserve(areas_count + 1);
+    areas_list.push_back(area_t("dummy", std::vector<std::uint16_t>()));
     for (int i = 0; i < areas_count; ++i)
     {
         auto area_name = std::string(parser.read_line());
         auto cities = cities_names_to_cities_idx(parser.read_line(), cities_indexer);
 
         // Check if the area contains start_city.
-        auto it = std::find(cities.cbegin(), cities.cend(), idx_start);
+        auto it = std::find(cities.cbegin(), cities.cend(), /*idx_start*/0);
         if (it != cities.cend())
         {
+            // Replace dummy area.
+            areas_list[0] = area_t(std::move(area_name), std::move(cities));
+            areas_list[0].set_selected_city(it - cities.cbegin());
         }
-
-        /*auto area_idx =*/ areas_indexer.add_area(area_t(std::move(area_name), std::move(cities)));
+        else
+            areas_list.push_back(area_t(std::move(area_name), std::move(cities)));
     }
 
     // Save all flights to the matrix.
@@ -129,17 +134,17 @@ int main()
 {
     // Create the holders of cities and areas [name <-> index] and price matrix.
     cities_map_t cities_indexer;
-    areas_map_t  areas_indexer;
+    std::vector<area_t> areas_list;
     matrix<std::uint16_t> costs_matrix;
 
-    parse_input_data(cities_indexer, areas_indexer, costs_matrix);
+    parse_input_data(cities_indexer, areas_list, costs_matrix);
 
     // Set timer to the end.
-    auto timeout = set_time_limit(cities_indexer.count(), areas_indexer.count());
+    auto timeout = set_time_limit(cities_indexer.count(), areas_list.size());
 
     // Generate the path between N cities.
     // Use the optimised solver in case there is only one city in each area.
-    if (areas_indexer.count() == cities_indexer.count())
+    if (areas_list.size() == cities_indexer.count())
     {
         // Generate a random path.
         path_t path(cities_indexer, costs_matrix, 0);
@@ -151,7 +156,7 @@ int main()
     else
     {
         // Generate a random path.
-        areapath_t path(areas_indexer, cities_indexer, costs_matrix, 0);
+        areapath_t path(std::move(areas_list), cities_indexer, costs_matrix);
 
         // Print the optimized path and the cost.
         path.optimize();

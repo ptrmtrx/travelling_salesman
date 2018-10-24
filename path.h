@@ -20,6 +20,21 @@
 //extern config g_config;
 extern std::atomic<bool> g_continue_run;
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+class path_base_t
+{
+public:
+    virtual void optimize() = 0;
+    virtual void print(std::ostream & out) = 0;
+
+    virtual ~path_base_t() = default;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 static constexpr double get_last_t(std::size_t cities)
 {
     if (cities < 55)
@@ -341,29 +356,96 @@ private:
 class areapath_t
 {
 public:
-    areapath_t(areas_map_t & areas_indexer, cities_map_t & cities_indexer, matrix<std::uint16_t> & costs_matrix, std::uint16_t start_city)
-        : m_areas_indexer{areas_indexer}
+    areapath_t(std::vector<area_t> && areas_list, cities_map_t & cities_indexer, matrix<std::uint16_t> & costs_matrix)
+        : m_path{std::move(areas_list)}
         , m_cities_indexer{cities_indexer}
         , m_costs{costs_matrix}
     {
-        m_path.reserve(m_areas_indexer.count() + 1);
-
-        // Find area with start_city and set it as the first and last city.
-        m_path[0] = m_path[cities] = start_city;
-        m_path[start_city] = 0;
-
-        // Create a random permutation.
-        std::random_shuffle(m_path.begin() + 1, m_path.begin() + cities);
+        // Set tha last area same as the first.
+        m_path.push_back(m_path[0]);
     }
 
     void optimize()
     {
         rnd_gen_t rng;
 
-        auto min_path = *this;
+        auto min_path = m_path;
         auto min_cost = cost();
 
         auto actual_cost = min_cost;
+
+        // Create uniform random generator for generating inner indexes in the path.
+//        std::uniform_int_distribution<std::uint16_t> gen_idx(1, static_cast<std::uint16_t>(cities_in_path() - 2));
+
+        // Create uniform random generator for generating random numbers on std::uint32_t.
+        std::uniform_int_distribution<std::uint32_t> gen_uint32(0, std::numeric_limits<std::uint32_t>::max());
+
+        // Some constants for temperature computing.
+//        auto Tn = /*g_config.iterations*/ 110 * 1000 * 1000;
+//        auto exp_base = std::log(get_last_t(cities_in_path()));
+
+        double actual_T = 1.0;
+
+        unsigned int iter = 0;
+        while (g_continue_run)
+        {
+            ++iter;
+
+//            if (iter % 512 /*g_config.recomp_T*/ == 1)
+//                actual_T = std::exp(exp_base * std::pow((double) iter / (double) Tn, 0.3));
+
+            // Randomly choose two indexes.
+//            auto i = gen_idx(rng);
+//            auto j = gen_idx(rng);
+
+            // Compute the best price.
+            enum method_t { SWAP, REVERSE, INSERT } method;
+            auto cost_diff = std::numeric_limits<std::int32_t>::max();
+
+            //if (g_config.use_swap)
+            {
+                method = SWAP;
+                //cost_diff = swap_cost_diff(i, j);
+            }
+
+            // Accept? Better ways accept every time || worse only with some probability.
+            bool accept = true;
+            if (cost_diff > 0)
+            {
+                auto rnd = gen_uint32(rng);
+                auto log_max_int = std::log(std::numeric_limits<std::uint32_t>::max());
+
+                auto right = (-cost_diff / (actual_T * m_costs.get_max())) + log_max_int;
+                auto left = std::log(rnd);
+
+                if (left > right)
+                {
+                    accept = false;
+                }
+            }
+
+            // If the new path should be accepted, save it.
+            if (accept)
+            {
+                //switch (method)
+                //{
+                //case SWAP:    swap(i, j); break;
+                //case REVERSE: reverse(i, j); break;
+                //case INSERT:  insert(i, j); break;
+                //}
+
+                actual_cost += cost_diff;
+
+                // If the actual path cost is the best one, save it.
+                if (actual_cost < min_cost)
+                {
+                    min_path = m_path;
+                    min_cost = actual_cost;
+                }
+            }
+        }
+
+        m_path = min_path;
     }
 
     void print(std::ostream & out) const
@@ -393,7 +475,7 @@ private:
     {
         std::uint32_t sum = 0;
         std::uint16_t from = 0; // start_city (always zero by design)
-        for (std::size_t i = 0; i < m_path.size(); ++i)
+        for (std::size_t i = 0; i < m_path.size() - 1; ++i)
         {
             auto to = m_path[i].get_selected_city();
             sum += m_costs.get(from, to, static_cast<std::uint16_t>(i));
@@ -424,7 +506,6 @@ private:
     std::vector<area_t> m_path;
 
     // A sources of data.
-    const areas_map_t  & m_areas_indexer;
     const cities_map_t & m_cities_indexer;
     const matrix<std::uint16_t> & m_costs;
 };
