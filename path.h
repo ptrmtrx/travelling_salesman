@@ -20,6 +20,21 @@
 //extern config g_config;
 extern std::atomic<bool> g_continue_run;
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+class path_base_t
+{
+public:
+    virtual void optimize() = 0;
+    virtual void print(std::ostream & out) = 0;
+
+    virtual ~path_base_t() = default;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 static constexpr double get_last_t(std::size_t cities)
 {
     if (cities < 55)
@@ -67,7 +82,7 @@ public:
         std::uniform_int_distribution<std::uint32_t> gen_uint32(0, std::numeric_limits<std::uint32_t>::max());
 
         // Some constants for temperature computing.
-        auto Tn = /*g_config.iterations*/ 110 * 1000 * 1000;
+        auto Tn = /*g_config.iterations*/ 2*55'000'000;
         auto exp_base = std::log(get_last_t(cities_in_path()));
 
         double actual_T = 1.0;
@@ -118,7 +133,7 @@ public:
             bool accept = true;
             if (cost_diff > 0)
             {
-                auto rnd = gen_uint32(rng);
+                auto rnd = static_cast<std::uint32_t>(rng());// gen_uint32(rng);
                 auto log_max_int = std::log(std::numeric_limits<std::uint32_t>::max());
 
                 auto right = (-cost_diff / (actual_T * m_costs.get_max())) + log_max_int;
@@ -150,7 +165,7 @@ public:
                 }
             }
         }
-
+        std::cout << "pocet iteraci (old): " << iter << std::endl;
         m_path = min_path;
     }
 
@@ -263,17 +278,17 @@ private:
                 return std::numeric_limits<std::int32_t>::max();
 
             before = m_costs.get(m_path[i - 1], m_path[i], i - 1)
-                + m_costs.get(m_path[j - 1], m_path[j], j - 1)
-                + m_costs.get(m_path[j], m_path[j + 1], j);
+                   + m_costs.get(m_path[j - 1], m_path[j], j - 1)
+                   + m_costs.get(m_path[j], m_path[j + 1], j);
 
             after = m_costs.get(m_path[i - 1], m_path[i + 1], i - 1)
-                + m_costs.get(m_path[j], m_path[i], j - 1)
-                + m_costs.get(m_path[i], m_path[j + 1], j);
+                  + m_costs.get(m_path[j], m_path[i], j - 1)
+                  + m_costs.get(m_path[i], m_path[j + 1], j);
 
             for (std::uint16_t k = i; k < j - 1; ++k)
             {
                 before += m_costs.get(m_path[k], m_path[k + 1], k);
-                after += m_costs.get(m_path[k + 1], m_path[k + 2], k);
+                after  += m_costs.get(m_path[k + 1], m_path[k + 2], k);
             }
         }
         else if (j < i)
@@ -282,17 +297,17 @@ private:
                 return std::numeric_limits<std::int32_t>::max();
 
             before = m_costs.get(m_path[j - 1], m_path[j], j - 1)
-                + m_costs.get(m_path[j], m_path[j + 1], j)
-                + m_costs.get(m_path[i], m_path[i + 1], i);
+                   + m_costs.get(m_path[j], m_path[j + 1], j)
+                   + m_costs.get(m_path[i], m_path[i + 1], i);
 
             after = m_costs.get(m_path[j - 1], m_path[i], j - 1)
-                + m_costs.get(m_path[i], m_path[j], j)
-                + m_costs.get(m_path[i - 1], m_path[i + 1], i);
+                  + m_costs.get(m_path[i], m_path[j], j)
+                  + m_costs.get(m_path[i - 1], m_path[i + 1], i);
 
             for (std::uint16_t k = j + 1; k < i; ++k)
             {
                 before += m_costs.get(m_path[k], m_path[k + 1], k);
-                after += m_costs.get(m_path[k - 1], m_path[k], k);
+                after  += m_costs.get(m_path[k - 1], m_path[k], k);
             }
         }
         else
@@ -341,29 +356,97 @@ private:
 class areapath_t
 {
 public:
-    areapath_t(areas_map_t & areas_indexer, cities_map_t & cities_indexer, matrix<std::uint16_t> & costs_matrix, std::uint16_t start_city)
-        : m_areas_indexer{areas_indexer}
+    areapath_t(std::vector<area_t> && areas_list, cities_map_t & cities_indexer, matrix<std::uint16_t> & costs_matrix)
+        : m_path{std::move(areas_list)}
         , m_cities_indexer{cities_indexer}
         , m_costs{costs_matrix}
     {
-        m_path.reserve(m_areas_indexer.count() + 1);
+        // Set tha last area same as the first.
+        m_path.push_back(m_path[0]);
 
-        // Find area with start_city and set it as the first and last city.
-        m_path[0] = m_path[cities] = start_city;
-        m_path[start_city] = 0;
-
-        // Create a random permutation.
-        std::random_shuffle(m_path.begin() + 1, m_path.begin() + cities);
+//        m_area_to_day = [0..m_path.size() - 1]; [ 0 1 2 3 4 5 6 7 8 9 10 ]
+//        m_day_to_area = [0..m_path.size() - 1]; [ 0 1 2 3 4 5 6 7 8 9 10 ]
     }
 
     void optimize()
     {
         rnd_gen_t rng;
 
-        auto min_path = *this;
+        auto min_path = m_path;
         auto min_cost = cost();
 
         auto actual_cost = min_cost;
+
+        // Create uniform random generator for generating inner indexes in the path.
+        std::uniform_int_distribution<std::uint16_t> gen_idx(1, static_cast<std::uint16_t>(m_path.size() - 2));
+
+        // Create uniform random generator for generating random numbers on std::uint32_t.
+        std::uniform_int_distribution<std::uint32_t> gen_uint32(0, std::numeric_limits<std::uint32_t>::max());
+
+        // Some constants for temperature computing.
+        auto Tn = /*g_config.iterations*/ 50'000'000;
+        auto exp_base = std::log(get_last_t(m_path.size()));
+
+        double actual_T = 1.0;
+
+        unsigned int iter = 0;
+        while (g_continue_run)
+        {
+            ++iter;
+
+            if (iter % 512 /*g_config.recomp_T*/ == 1)
+                actual_T = std::exp(exp_base * std::pow((double) iter / (double) Tn, 0.3));
+
+            // Randomly choose two indexes.
+            auto i = gen_idx(rng);
+            auto j = gen_idx(rng);
+
+            // Compute the best price.
+            enum method_t { SWAP_AREAS } method;
+            auto cost_diff = std::numeric_limits<std::int32_t>::max();
+
+            //if (g_config.use_swap)
+            {
+                method = SWAP_AREAS;
+                cost_diff = swap_areas_cost_diff(i, j);
+            }
+
+            // Accept? Better ways accept every time || worse only with some probability.
+            bool accept = true;
+            if (cost_diff > 0)
+            {
+                auto rnd = gen_uint32(rng);
+                auto log_max_int = std::log(std::numeric_limits<std::uint32_t>::max());
+
+                auto right = (-cost_diff / (actual_T * m_costs.get_max())) + log_max_int;
+                auto left = std::log(rnd);
+
+                if (left > right)
+                {
+                    accept = false;
+                }
+            }
+
+            // If the new path should be accepted, save it.
+            if (accept)
+            {
+                switch (method)
+                {
+                case SWAP_AREAS: swap_areas(i, j); break;
+                }
+
+                actual_cost += cost_diff;
+
+                // If the actual path cost is the best one, save it.
+                if (actual_cost < min_cost)
+                {
+                    min_path = m_path;
+                    min_cost = actual_cost;
+                }
+            }
+        }
+        std::cout << "pocet iteraci (new): " << iter << std::endl;
+        m_path = min_path;
     }
 
     void print(std::ostream & out) const
@@ -374,16 +457,16 @@ public:
         // Print the path.
         for (size_t i = 0; i < m_path.size() - 1; ++i)
         {
-            auto src_idx = m_path[i];
-            auto dst_idx = m_path[i + 1];
+            auto src_idx = m_path[i].get_selected_city();
+            auto dst_idx = m_path[i + 1].get_selected_city();
 
-        //    out << map.get_city_object(src_idx);
+            out << m_cities_indexer.get_city_object(src_idx);
             out << ' ';
-        //    out << map.get_city_object(dst_idx);
+            out << m_cities_indexer.get_city_object(dst_idx);
             out << ' ';
             out << i;
             out << ' ';
-        //    out << m_costs.get(src_idx, dst_idx, (std::uint16_t)i);
+            out << m_costs.get(src_idx, dst_idx, (std::uint16_t)i);
             out << std::endl;
         }
     }
@@ -392,8 +475,8 @@ private:
     std::uint32_t cost() const noexcept
     {
         std::uint32_t sum = 0;
-        std::uint16_t from = 0; // start_city (always zero by design)
-        for (std::size_t i = 0; i < m_path.size(); ++i)
+        auto from = m_path[0].get_selected_city();
+        for (std::size_t i = 1; i < m_path.size(); ++i)
         {
             auto to = m_path[i].get_selected_city();
             sum += m_costs.get(from, to, static_cast<std::uint16_t>(i));
@@ -404,12 +487,48 @@ private:
 
     std::int32_t swap_areas_cost_diff(std::uint16_t i, std::uint16_t j) const noexcept
     {
-        return 0;
+        std::int32_t before;
+        std::int32_t after;
+
+        auto pim1 = m_path[i - 1].get_selected_city();
+        auto pi   = m_path[i].get_selected_city();
+        auto pip1 = m_path[i + 1].get_selected_city();
+
+        auto pjm1 = m_path[j - 1].get_selected_city();
+        auto pj   = m_path[j].get_selected_city();
+        auto pjp1 = m_path[j + 1].get_selected_city();
+
+        if (std::abs(i - j) > 1)
+        {
+            before = m_costs.get(pim1, pi, i - 1) + m_costs.get(pi, pip1, i)
+                   + m_costs.get(pjm1, pj, j - 1) + m_costs.get(pj, pjp1, j);
+            after  = m_costs.get(pim1, pj, i - 1) + m_costs.get(pj, pip1, i)
+                   + m_costs.get(pjm1, pi, j - 1) + m_costs.get(pi, pjp1, j);
+        }
+        else if (i + 1 == j)
+        {
+            before = m_costs.get(pim1, pi, i - 1) + m_costs.get(pi, pj, i) + m_costs.get(pj, pjp1, j);
+            after  = m_costs.get(pim1, pj, i - 1) + m_costs.get(pj, pi, i) + m_costs.get(pi, pjp1, j);
+        }
+        else if (i - 1 == j)
+        {
+            before = m_costs.get(pjm1, pj, j - 1) + m_costs.get(pj, pi, j) + m_costs.get(pi, pip1, i);
+            after  = m_costs.get(pjm1, pi, j - 1) + m_costs.get(pi, pj, j) + m_costs.get(pj, pip1, i);
+        }
+        else
+        {
+            before = 0;
+            after  = 0;
+        }
+
+        return after - before;
     }
 
     void swap_areas(std::uint16_t i, std::uint16_t j) noexcept
     {
-        
+        //std::swap(m_day_to_zone[i], m_day_to_zone[j]);
+        //m_zone_to_day[m_day_to_zone[i]] = i;
+        //m_zone_to_day[m_day_to_zone[j]] = j;
     }
 
     std::int32_t select_city_cost_diff(std::uint16_t i, std::uint16_t j) const noexcept
@@ -422,9 +541,10 @@ private:
     }
 
     std::vector<area_t> m_path;
+    std::vector<std::uint16_t> m_day_to_area;
+    std::vector<std::uint16_t> m_area_to_day;
 
     // A sources of data.
-    const areas_map_t  & m_areas_indexer;
     const cities_map_t & m_cities_indexer;
     const matrix<std::uint16_t> & m_costs;
 };

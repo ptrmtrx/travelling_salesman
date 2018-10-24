@@ -16,7 +16,7 @@ class xorshift128plus
 public:
     typedef std::uint64_t result_type;
  
-    xorshift128plus(std::uint32_t seed)
+    xorshift128plus(std::uint32_t seed = 0)
     {
         m_state[0] = (seed + 249863319);
         m_state[1] = (seed + 249863319);
@@ -51,7 +51,7 @@ class xoroshiro128plus
 public:
     typedef std::uint64_t result_type;
 
-    xoroshiro128plus(std::uint32_t seed)
+    xoroshiro128plus(std::uint32_t seed = 0)
     {
         m_state[0] = (seed + 249863319);
         m_state[1] = (seed + 249863319);
