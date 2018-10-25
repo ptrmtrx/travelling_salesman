@@ -106,14 +106,14 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
             auto pos = std::distance(it, cities.cbegin());
             // Replace dummy area.
             areas_list[0] = area_t(std::move(area_name), std::move(cities));
-            areas_list[0].set_selected_city(pos);
+            areas_list[0].set_selected_city(static_cast<std::uint16_t>(pos));
         }
         else
             areas_list.push_back(area_t(std::move(area_name), std::move(cities)));
     }
 
     // Save all flights to the matrix.
-    costs_matrix.set_dim(cities_indexer.count());
+    costs_matrix.set_dim(static_cast<unsigned int>(cities_indexer.count()));
     char * from, * to;
     std::uint16_t day, price;
     while (parser.parse_line(from, to, day, price))
@@ -145,24 +145,24 @@ int main()
 
     // Generate the path between N cities.
     // Use the optimised solver in case there is only one city in each area.
-    if (areas_list.size() == cities_indexer.count())
+//    if (areas_list.size() == cities_indexer.count())
     {
         // Generate a random path.
-        path_t path(cities_indexer, costs_matrix, 0);
+        path_t path(&cities_indexer, &costs_matrix, 0);
 
         // Print the optimized path and the cost.
         path.optimize();
-     //   path.print(std::cout);
+//        path.print(std::cout);
     }
-    else
-    {
-        // Generate a random path.
-        areapath_t path(std::move(areas_list), cities_indexer, costs_matrix);
+    //else
+    //{
+    //    // Generate a random path.
+    //    areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
 
-        // Print the optimized path and the cost.
-        path.optimize();
-        path.print(std::cout);
-    }
+    //    // Print the optimized path and the cost.
+    //    path.optimize();
+    //    path.print(std::cout);
+    //}
 
     timeout.join();
 

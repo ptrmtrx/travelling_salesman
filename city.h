@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <string>
@@ -105,13 +106,36 @@ private:
 //public:
 //    cities_map_t()
 //    {
+//        m_map.reserve(300);
 //    }
 //
 //    std::uint16_t get_city_index(const city_t & city)
 //    {
+//        auto it = std::find_if(m_map.cbegin(), m_map.cend(), [&](auto & c) { return c.first == city; });
+//        if (it != m_map.end())
+//            return it->second;
+//
+//        m_map.emplace_back(city, m_last_idx);
+//        return m_last_idx++;
 //    }
 //
 //    city_t get_city_object(std::uint16_t idx) const
 //    {
+//        for (const auto & pair : m_map)
+//        {
+//            if (pair.second == idx)
+//                return pair.first;
+//        }
+//
+//        throw std::runtime_error("get_city_object");
 //    }
+//
+//    std::size_t count() const
+//	{
+//		return m_map.size();
+//	}
+//
+//private:
+//    std::vector<std::pair<city_t, std::uint16_t>> m_map;
+//    std::uint16_t m_last_idx = 0;
 //};
