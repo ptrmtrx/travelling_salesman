@@ -13,7 +13,6 @@
 #include <numeric>
 #include <vector>
 
-#include "area.h"
 #include "city.h"
 #include "random.h"
 
@@ -256,13 +255,13 @@ private:
             return std::numeric_limits<std::int32_t>::max();
 
         auto before = m_costs->get(m_path[k - 1], m_path[k], k - 1) + m_costs->get(m_path[l], m_path[l + 1], l);
-        auto after = m_costs->get(m_path[k - 1], m_path[l], k - 1) + m_costs->get(m_path[k], m_path[l + 1], l);
+        auto after  = m_costs->get(m_path[k - 1], m_path[l], k - 1) + m_costs->get(m_path[k], m_path[l + 1], l);
 
         auto end = l - k;
         for (std::uint16_t idx = 0; idx < end; ++idx)
         {
             before += m_costs->get(m_path[k + idx], m_path[k + idx + 1], k + idx);
-            after += m_costs->get(m_path[l - idx], m_path[l - idx - 1], k + idx);
+            after  += m_costs->get(m_path[l - idx], m_path[l - idx - 1], k + idx);
         }
 
         return after - before;

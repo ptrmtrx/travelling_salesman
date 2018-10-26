@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 
 class city_t
@@ -99,6 +100,32 @@ public:
 private:
 	std::unordered_map<city_t, std::uint16_t, city_hasher> m_map;
 	std::uint16_t m_last_idx = 0;
+};
+
+
+class area_t
+{
+public:
+    area_t(/*std::string && name,*/ std::vector<std::uint16_t> && cities_idx)
+        : m_selected_city_pos{0}
+        , m_cities{std::move(cities_idx)}
+//        , m_name{std::move(name)}
+    {
+    }
+
+//    const std::string & get_name()    const noexcept { return m_name; }
+    std::uint16_t get_selected_city() const noexcept { return m_cities[m_selected_city_pos]; }
+
+    void set_selected_city(std::uint16_t pos)
+    {
+        assert(pos < m_cities.size());
+        m_selected_city_pos = pos;
+    }
+
+private:
+    unsigned int m_selected_city_pos;
+    std::vector<std::uint16_t> m_cities;
+//    std::string m_name;
 };
 
 //class cities_map_t

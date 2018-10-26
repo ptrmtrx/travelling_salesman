@@ -17,7 +17,6 @@
 #include <thread>
 #include <vector>
 
-#include "area.h"
 #include "city.h"
 #include "config.h"
 #include "matrix.h"
@@ -93,10 +92,10 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
     // Load areas.
     areas_list.clear();
     areas_list.reserve(areas_count + 1);
-    areas_list.push_back(area_t("dummy", std::vector<std::uint16_t>()));
+    areas_list.push_back(area_t(/*"dummy",*/ std::vector<std::uint16_t>()));
     for (int i = 0; i < areas_count; ++i)
     {
-        auto area_name = std::string(parser.read_line());
+        parser.read_line();//auto area_name = std::string(parser.read_line());
         auto cities = cities_names_to_cities_idx(parser.read_line(), cities_indexer);
 
         // Check if the area contains start_city.
@@ -105,11 +104,11 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
         {
             auto pos = std::distance(it, cities.cbegin());
             // Replace dummy area.
-            areas_list[0] = area_t(std::move(area_name), std::move(cities));
+            areas_list[0] = area_t(/*std::move(area_name),*/ std::move(cities));
             areas_list[0].set_selected_city(static_cast<std::uint16_t>(pos));
         }
         else
-            areas_list.push_back(area_t(std::move(area_name), std::move(cities)));
+            areas_list.push_back(area_t(/*std::move(area_name),*/ std::move(cities)));
     }
 
     // Save all flights to the matrix.
@@ -125,7 +124,8 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
             costs_matrix.set(idx_src, idx_dst, day - 1, price);
         else
         {
-            for (int j = 0; j < cities_indexer.count(); ++j)
+            auto count = cities_indexer.count();
+            for (int j = 0; j < count; ++j)
                 costs_matrix.set(idx_src, idx_dst, j, price);
         }
     }
@@ -149,23 +149,23 @@ int main()
     // Generate the path between N cities.
     // Use the optimised solver in case there is only one city in each area.
 //    if (areas_list.size() == cities_indexer.count())
-    {
-        // Generate a random path.
-        path_t path(&cities_indexer, &costs_matrix, 0);
+    // {
+    //     // Generate a random path.
+    //     path_t path(&cities_indexer, &costs_matrix, 0);
 
-        // Print the optimized path and the cost.
-        path.optimize();
-//        path.print(std::cout);
-    }
+    //     // Print the optimized path and the cost.
+    //     path.optimize();
+    //     //path.print(std::cout);
+    // }
     //else
-    //{
-    //    // Generate a random path.
-    //    areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
+    {
+       // Generate a random path.
+       areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
 
-    //    // Print the optimized path and the cost.
-    //    path.optimize();
-    //    path.print(std::cout);
-    //}
+       // Print the optimized path and the cost.
+       path.optimize();
+       //path.print(std::cout);
+    }
 
     timeout.join();
 
