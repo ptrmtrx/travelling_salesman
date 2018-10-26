@@ -124,7 +124,10 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
         if (day)
             costs_matrix.set(idx_src, idx_dst, day - 1, price);
         else
-            assert(!"zero day");
+        {
+            for (int j = 0; j < cities_indexer.count(); ++j)
+                costs_matrix.set(idx_src, idx_dst, j, price);
+        }
     }
 }
 

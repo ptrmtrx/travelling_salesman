@@ -63,14 +63,13 @@ public:
 
 	void set(std::uint16_t x, std::uint16_t y, std::uint16_t z, T value) noexcept
 	{
-        assert(x < m_dim);
-        assert(y < m_dim);
-        assert(z < m_dim);
+        if (value < get(x, y, z))
+        {
+		    m_matrix[(x * m_dim * m_dim) + (y * m_dim) + (z)] = value;
 
-		m_matrix[(x * m_dim * m_dim) + (y * m_dim) + (z)] = value;
-
-		if (value > m_max_val)
-			m_max_val = value;
+		    if (value > m_max_val)
+			    m_max_val = value;
+        }
 	}
 
 private:
