@@ -42,7 +42,7 @@ static constexpr double get_last_t(std::size_t cities)
     if (cities < 105)
         return 0.002;
 
-    return 0.0005;
+    return 0.005;
 }
 
 
@@ -78,7 +78,7 @@ public:
         std::uniform_int_distribution<std::uint16_t> gen_idx(1, static_cast<std::uint16_t>(cities_in_path() - 2));
 
         // Some constants for temperature computing.
-        auto Tn = /*g_config.iterations*/ 55'000'000;
+        auto Tn = /*g_config.iterations*/ 50'000'000;
         auto exp_base = std::log(get_last_t(cities_in_path()));
 
         double actual_T = 1.0;
@@ -97,13 +97,10 @@ public:
             enum method_t { SWAP, REVERSE, INSERT } method;
             auto cost_diff = std::numeric_limits<std::int32_t>::max();
 
-            //if (g_config.use_swap)
             {
                 method = SWAP;
                 cost_diff = swap_cost_diff(i, j);
             }
-
-            //if (g_config.use_reverse)
             {
                 auto price = reverse_cost_diff(i, j);
                 if (price < cost_diff)
@@ -112,8 +109,6 @@ public:
                     method = REVERSE;
                 }
             }
-
-            //if (g_config.use_insert)
             {
                 auto price = insert_cost_diff(i, j);
                 if (price < cost_diff)
@@ -168,27 +163,26 @@ public:
         out << cost() << std::endl;
 
         // Print the path.
-        auto src_idx = m_path[0];
-        auto src_city = m_cities_indexer->get_city_object(src_idx);
+        // auto src_idx = m_path[0];
+        // auto src_city = m_cities_indexer->get_city_object(src_idx);
 
-        for (std::uint16_t i = 0; i < m_path.size() - 1; ++i)
-        {
-            auto dst_idx = m_path[i + 1];
-            auto dst_city = m_cities_indexer->get_city_object(dst_idx);
+        // for (std::uint16_t i = 0; i < m_path.size() - 1; ++i)
+        // {
+        //     auto dst_idx = m_path[i + 1];
+        //     auto dst_city = m_cities_indexer->get_city_object(dst_idx);
 
-            out << src_city;
-            out << ' ';
-            out << dst_city;
-            out << ' ';
-            out << i;
-            out << ' ';
-            out << m_costs->get(src_idx, dst_idx, i);
-            out << '\n';
+        //     out << src_city;
+        //     out << ' ';
+        //     out << dst_city;
+        //     out << ' ';
+        //     out << i + 1;
+        //     out << ' ';
+        //     out << m_costs->get(src_idx, dst_idx, i);
+        //     out << std::endl;
 
-            src_idx = dst_idx;
-            src_city = dst_city;
-        }
-        out.flush();
+        //     src_idx = dst_idx;
+        //     src_city = dst_city;
+        // }
     }
 
 private:
@@ -353,6 +347,12 @@ private:
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+struct zone_city_t
+{
+    std::uint16_t zone_idx;
+    std::uint16_t city_pos;
+};
+
 class areapath_t
 {
 public:
@@ -369,6 +369,12 @@ public:
         // Init supported structures.
         std::iota(m_area_to_day.begin(), m_area_to_day.end(), static_cast<std::uint16_t>(0));
         std::iota(m_day_to_area.begin(), m_day_to_area.end(), static_cast<std::uint16_t>(0));
+
+        // Generate array with zones with swithable cities.
+        // Don't count the first one but count the last one.
+        for (std::uint16_t i = 1; i < m_path.size(); ++i)
+            for (std::uint16_t j = 1; j < m_path[i].m_cities.size(); ++j)
+                m_cities_choises.push_back({i, j});
     }
 
     void optimize()
@@ -383,6 +389,9 @@ public:
         // Create uniform random generator for generating inner indexes in the path.
         std::uniform_int_distribution<std::uint16_t> gen_idx(1, static_cast<std::uint16_t>(m_path.size() - 2));
 
+        // Create uniform random generator for generating inner indexes in the cities choises.
+        std::uniform_int_distribution<std::uint16_t> gen_sc_idx(0, static_cast<std::uint16_t>(m_cities_choises.size()));
+
         // Some constants for temperature computing.
         auto Tn = /*g_config.iterations*/ 55'000'000;
         auto exp_base = std::log(get_last_t(m_path.size()));
@@ -396,17 +405,27 @@ public:
                 actual_T = std::exp(exp_base * std::pow(iter / (double)Tn, 0.3));
 
             // Randomly choose two indexes.
-            auto i = gen_idx(rng);
-            auto j = gen_idx(rng);
+            std::uint16_t i, j;
 
             // Compute the best price.
-            enum method_t { SWAP_AREAS } method;
+            enum method_t { SWAP_AREAS, SELECT_CITY } method;
             auto cost_diff = std::numeric_limits<std::int32_t>::max();
 
-            //if (g_config.use_swap)
+            if ((iter & 0x1) == 0x1)
             {
+                i = gen_idx(rng);
+                j = gen_idx(rng);
                 method = SWAP_AREAS;
                 cost_diff = swap_areas_cost_diff(i, j);
+            }
+            else
+            {
+                auto x = gen_sc_idx(rng);
+                i = m_cities_choises[x].zone_idx;
+                j = m_cities_choises[x].city_pos;
+
+                method = SELECT_CITY;
+                cost_diff = select_city_cost_diff(i, j);
             }
 
             // Accept? Better ways accept every time || worse only with some probability.
@@ -428,6 +447,7 @@ public:
                 switch (method)
                 {
                 case SWAP_AREAS: swap_areas(i, j); break;
+                case SELECT_CITY: select_city(i, j); break;
                 }
 
                 actual_cost += cost_diff;
@@ -452,22 +472,22 @@ public:
         out << cost() << std::endl;
 
         // Print the path.
-        auto src_idx = static_cast<std::uint16_t>(0);
-        for (std::uint16_t i = 1; i < m_path.size(); ++i)
-        {
-            auto dst_idx = city(i);
+        // auto src_idx = static_cast<std::uint16_t>(0);
+        // for (std::uint16_t i = 1; i < m_path.size(); ++i)
+        // {
+        //     auto dst_idx = city(i);
 
-            out << m_cities_indexer->get_city_object(src_idx);
-            out << ' ';
-            out << m_cities_indexer->get_city_object(dst_idx);
-            out << ' ';
-            out << i;
-            out << ' ';
-            out << m_costs->get(src_idx, dst_idx, i - 1);
-            out << std::endl;
+        //     out << m_cities_indexer->get_city_object(src_idx);
+        //     out << ' ';
+        //     out << m_cities_indexer->get_city_object(dst_idx);
+        //     out << ' ';
+        //     out << i;
+        //     out << ' ';
+        //     out << m_costs->get(src_idx, dst_idx, i - 1);
+        //     out << std::endl;
 
-            src_idx = dst_idx;
-        }
+        //     src_idx = dst_idx;
+        // }
     }
 
 private:
@@ -535,22 +555,37 @@ private:
         m_area_to_day[m_day_to_area[j]] = j;
     }
 
-    std::int32_t select_city_cost_diff(std::uint16_t i, std::uint16_t j) const noexcept
+    std::int32_t select_city_cost_diff(std::uint16_t zone_idx, std::uint16_t new_city_pos) const noexcept
     {
-        (void)i;
-        (void)j;
-        return 0;
+        // zone_idx will never be index of zone on day zero, because on day zero there is always one city
+        // and it is ensured that we generate only zone_idx of zones with more than one city.
+        assert(zone_idx > 0);
+        auto day = m_area_to_day[zone_idx];
+        auto city_before_idx = city(day - 1);
+
+        std::int32_t before = m_costs->get(city_before_idx, m_path[zone_idx].get_nth_city(0), day - 1);
+        std::int32_t after  = m_costs->get(city_before_idx, m_path[zone_idx].get_nth_city(new_city_pos), day - 1);
+
+        if (day < m_path.size() - 1)
+        {
+            auto city_after_idx = city(day + 1);
+            before += m_costs->get(m_path[zone_idx].get_nth_city(0), city_after_idx, day);
+            after  += m_costs->get(m_path[zone_idx].get_nth_city(new_city_pos), city_after_idx, day);
+        }
+
+        return after - before;
     }
 
-    void select_city(std::uint16_t i, std::uint16_t j) noexcept
+    void select_city(std::uint16_t zone_idx, std::uint16_t new_city_pos) noexcept
     {
-        (void)i;
-        (void)j;
+        m_path[zone_idx].set_selected_city(new_city_pos);
     }
 
     std::vector<area_t> m_path;
     std::vector<std::uint16_t> m_day_to_area;
     std::vector<std::uint16_t> m_area_to_day;
+
+    std::vector<zone_city_t> m_cities_choises;
 
     // A sources of data.
     const cities_map_t * m_cities_indexer;

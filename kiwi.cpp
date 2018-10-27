@@ -35,7 +35,7 @@ static std::thread set_time_limit(std::size_t cities_count, std::size_t areas_co
     auto time = 15s;
     if (areas_count <= 20 && cities_count < 50)
         time = 3s;
-    else if (areas_count <= 50 && cities_count < 200)
+    else if (areas_count <= 100 && cities_count < 200)
         time = 5s;
 
     auto elapsed_time = std::chrono::high_resolution_clock::now() - g_start_time;
@@ -148,23 +148,23 @@ int main()
 
     // Generate the path between N cities.
     // Use the optimised solver in case there is only one city in each area.
-//    if (areas_list.size() == cities_indexer.count())
-    // {
-    //     // Generate a random path.
-    //     path_t path(&cities_indexer, &costs_matrix, 0);
+    if (areas_list.size() == cities_indexer.count())
+    {
+        // Generate a random path.
+        path_t path(&cities_indexer, &costs_matrix, 0);
 
-    //     // Print the optimized path and the cost.
-    //     path.optimize();
-    //     //path.print(std::cout);
-    // }
-    //else
+        // Print the optimized path and the cost.
+        path.optimize();
+        path.print(std::cout);
+    }
+    else
     {
        // Generate a random path.
        areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
 
        // Print the optimized path and the cost.
        path.optimize();
-       //path.print(std::cout);
+       path.print(std::cout);
     }
 
     timeout.join();

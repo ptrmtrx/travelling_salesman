@@ -106,26 +106,24 @@ private:
 class area_t
 {
 public:
-    area_t(/*std::string && name,*/ std::vector<std::uint16_t> && cities_idx)
-        : m_selected_city_pos{0}
-        , m_cities{std::move(cities_idx)}
-//        , m_name{std::move(name)}
+    area_t(std::vector<std::uint16_t> && cities_idx)
+        : m_cities{std::move(cities_idx)}
     {
     }
 
-//    const std::string & get_name()    const noexcept { return m_name; }
-    std::uint16_t get_selected_city() const noexcept { return m_cities[m_selected_city_pos]; }
+    std::uint16_t get_nth_city(int i) const noexcept { assert(i < m_cities.size()); return m_cities[i]; }
+	std::uint16_t get_selected_city() const noexcept { return m_cities[0]; }
 
-    void set_selected_city(std::uint16_t pos)
+    void set_selected_city(std::uint16_t pos) noexcept
     {
         assert(pos < m_cities.size());
-        m_selected_city_pos = pos;
+
+		// Selected city is always the first.
+        std::swap(m_cities[0], m_cities[pos]);
     }
 
-private:
-    unsigned int m_selected_city_pos;
+//private:
     std::vector<std::uint16_t> m_cities;
-//    std::string m_name;
 };
 
 //class cities_map_t
