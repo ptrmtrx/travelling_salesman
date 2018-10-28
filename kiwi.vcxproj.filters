@@ -14,6 +14,9 @@
     <ClCompile Include="kiwi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="city.h">
@@ -37,5 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ts.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="notes.txt" />
   </ItemGroup>
 </Project>

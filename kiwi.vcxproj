@@ -161,6 +161,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="kiwi.cpp" />
+    <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="city.h" />
@@ -172,6 +173,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ts.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="notes.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

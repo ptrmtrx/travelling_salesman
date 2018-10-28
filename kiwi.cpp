@@ -92,10 +92,10 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
     // Load areas.
     areas_list.clear();
     areas_list.reserve(areas_count + 1);
-    areas_list.push_back(area_t(/*"dummy",*/ std::vector<std::uint16_t>()));
+    areas_list.push_back(area_t(std::vector<std::uint16_t>())); // dummy area
     for (int i = 0; i < areas_count; ++i)
     {
-        parser.read_line();//auto area_name = std::string(parser.read_line());
+        parser.read_line();
         auto cities = cities_names_to_cities_idx(parser.read_line(), cities_indexer);
 
         // Check if the area contains start_city.
@@ -104,8 +104,8 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
         {
             auto pos = std::distance(it, cities.cbegin());
             // Replace dummy area.
-            areas_list[0] = area_t(/*std::move(area_name),*/ std::move(cities));
-            areas_list[0].set_selected_city(static_cast<std::uint16_t>(pos));
+            areas_list[0] = area_t(std::move(cities));
+            std::swap(areas_list[0], areas_list[pos]);
         }
         else
             areas_list.push_back(area_t(/*std::move(area_name),*/ std::move(cities)));
@@ -125,7 +125,7 @@ static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> 
         else
         {
             auto count = cities_indexer.count();
-            for (int j = 0; j < count; ++j)
+            for (std::uint16_t j = 0; j < count; ++j)
                 costs_matrix.set(idx_src, idx_dst, j, price);
         }
     }

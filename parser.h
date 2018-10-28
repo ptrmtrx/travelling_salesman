@@ -5,23 +5,7 @@
  */
 
 #pragma once
-
 #include <cstdio>
-
-
-class line_reader_t
-{
-public:
-    // Returns whole line from stdin, nullptr on EOF.
-    char * next_line()
-    {
-        return std::fgets(m_buffer, sizeof(m_buffer), stdin);
-    }
-
-private:
-    char m_buffer[2048];
-};
-
 
 class parser_t
 {
@@ -31,19 +15,19 @@ public:
     // Returns whole line, nullptr on EOF.
     char * read_line()
     {
-        return m_input.next_line();
+        return next_line();
     }
 
     void parse_line(std::uint16_t & num, char *& str)
     {
-        auto line = read_line();
+        auto line = next_line();
         read_uint16(line, num);
         read_str(line, str);
     }
 
     bool parse_line(char *& from, char *& to, std::uint16_t & day, std::uint16_t & price)
     {
-        auto line = read_line();
+        auto line = next_line();
         if (!line)
             return false;
 
@@ -81,5 +65,11 @@ private:
         }
     }
 
-    line_reader_t m_input;
+    // Returns whole line from stdin, nullptr on EOF.
+    char * next_line()
+    {
+        return std::fgets(m_buffer, sizeof(m_buffer), stdin);
+    }
+
+    char m_buffer[2048];
 };
