@@ -45,6 +45,12 @@ static constexpr double get_last_t(std::size_t cities)
     return 0.005;
 }
 
+static constexpr std::uint16_t bound_value(std::uint16_t rnd, std::uint16_t range)
+{
+    std::uint32_t x = static_cast<std::uint32_t>(rnd) * static_cast<std::uint32_t>(range);
+    return x >> 16;
+}
+
 
 class path_t
 {
@@ -75,7 +81,7 @@ public:
         auto actual_cost = min_cost;
 
         // Some constants for temperature computing.
-        auto Tn = /*g_config.iterations*/ 50'000'000;
+        auto Tn = /*g_config.iterations*/ 70'000'000;
         auto exp_base = std::log(get_last_t(cities_in_path()));
 
         double actual_T = 1.0;
@@ -93,8 +99,8 @@ public:
             auto i = static_cast<std::uint16_t>(xrnd >> 32);
             auto j = static_cast<std::uint16_t>(xrnd >> 48);
 
-            i %= (m_path.size() - 2); ++i;
-            j %= (m_path.size() - 2); ++j;
+            i = bound_value(i, static_cast<std::uint16_t>(m_path.size()) - 2) + 1;
+            j = bound_value(j, static_cast<std::uint16_t>(m_path.size()) - 2) + 1;
 
             // Compute the best price.
             enum method_t { SWAP, REVERSE, INSERT } method;
@@ -350,12 +356,6 @@ private:
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-struct zone_city_t
-{
-    std::uint16_t zone_idx;
-    std::uint16_t city_pos;
-};
-
 class areapath_t
 {
 public:
@@ -420,8 +420,8 @@ public:
                 j = static_cast<std::uint16_t>(xrnd >> 48);
 
                 // generate indexes 1..m_path.size()
-                i %= (m_path.size() - 2); ++i;
-                j %= (m_path.size() - 2); ++j;
+                i = bound_value(i, static_cast<std::uint16_t>(m_path.size()) - 2) + 1;
+                j = bound_value(j, static_cast<std::uint16_t>(m_path.size()) - 2) + 1;
 
                 method = SWAP_AREAS;
                 cost_diff = swap_areas_cost_diff(i, j);
@@ -446,7 +446,7 @@ public:
             if (m_cities_choises.size())
             {
                 auto x = static_cast<std::uint16_t>(xrnd >> 32);
-                x %= (m_cities_choises.size() - 1);
+                x = bound_value(x, static_cast<std::uint16_t>(m_cities_choises.size()) - 1);
                 auto xi = m_cities_choises[x].zone_idx;
                 auto xj = m_cities_choises[x].city_pos;
 
@@ -716,8 +716,13 @@ private:
     void select_city(std::uint16_t zone_idx, std::uint16_t new_city_pos) noexcept
     {
         std::swap(m_path[zone_idx][0], m_path[zone_idx][new_city_pos]);
-        //m_path[zone_idx].set_selected_city(new_city_pos);
     }
+
+    struct zone_city_t
+    {
+        std::uint16_t zone_idx;
+        std::uint16_t city_pos;
+    };
 
     std::vector<area_t> m_path;
     std::vector<std::uint16_t> m_day_to_area;
