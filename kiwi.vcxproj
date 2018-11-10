@@ -161,7 +161,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="kiwi.cpp" />
-    <ClCompile Include="test.cpp" />
+    <Text Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="city.h" />

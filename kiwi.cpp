@@ -39,9 +39,7 @@ static std::thread set_time_limit(std::size_t cities_count, std::size_t areas_co
         time = 5s;
 
     auto elapsed_time = std::chrono::high_resolution_clock::now() - g_start_time;
-    std::cout << "parsovani az do nastaveni casu je: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time).count() << std::endl;
-
-    return std::thread([=]{ std::this_thread::sleep_for(time - elapsed_time - 100ms); g_continue_run = false; });
+    return std::thread([=]{ std::this_thread::sleep_for(time - elapsed_time - 50ms); g_continue_run = false; });
 }
 
 
@@ -146,29 +144,13 @@ int main()
     // Set timer to the end.
     auto timeout = set_time_limit(cities_indexer.count(), areas_list.size());
 
-    // Generate the path between N cities.
-    // Use the optimised solver in case there is only one city in each area.
-    if (areas_list.size() == cities_indexer.count())
-    {
-        // Generate a random path.
-        path_t path(&cities_indexer, &costs_matrix, 0);
+    // Generate a random path.
+    areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
 
-        // Print the optimized path and the cost.
-        path.optimize();
-        path.print(std::cout);
-    }
-    else
-    {
-       // Generate a random path.
-       areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
-
-       // Print the optimized path and the cost.
-       path.optimize();
-       path.print(std::cout);
-    }
+    // Print the optimized path and the cost.
+    path.optimize();
+    path.print(std::cout);
 
     timeout.join();
-
-    std::cout << "execution time is: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - g_start_time).count() << std::endl;
     return 0;
 }

@@ -88,7 +88,6 @@ private:
     std::uint64_t m_state[2];
 };
 
-//typedef std::mt19937     rnd_gen_t;
 //typedef std::mt19937_64  rnd_gen_t;
 //typedef xorshift128plus  rnd_gen_t;
 typedef xoroshiro128plus rnd_gen_t;
