@@ -5,330 +5,152 @@
  */
 
 #include <atomic>
+#include <cctype>
+#include <chrono>
 #include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <memory>
-#include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "city.h"
 #include "config.h"
-#include "csv.h"
 #include "matrix.h"
+#include "parser.h"
 #include "path.h"
+#include "random.h"
 
-
-// Simulation of: /usr/bin/timeout --signal=SIGTERM --kill-after=1s 30s /app/run < data_300.txt
-//std::thread timeout([]
-//{
-//	std::this_thread::sleep_for(std::chrono::seconds(30));
-//	std::raise(SIGTERM);
-//});
-
-//// Global config data.
-//config g_config;
-matrix<std::uint16_t> path_t::s_costs(300);
+// Start of the program
+static const auto g_start_time = std::chrono::high_resolution_clock::now();
 std::atomic<bool> g_continue_run(true);
 
-void signal_handler(int signum)
+static std::thread set_time_limit(std::size_t cities_count, std::size_t areas_count)
 {
-	if (signum == SIGTERM)
-		g_continue_run = false;
-}
+    using namespace std::chrono_literals;
 
-//
-//class xorshift
-//{
-//public:
-//	typedef std::uint64_t result_type;
-//
-//	xorshift(std::uint32_t seed)
-//		: m_state(seed + 249863319)
-//		, m_state1(seed + 2498633199)
-//	{
-//	}
-//
-//	xorshift(xorshift &&) = default;
-//	xorshift & operator=(xorshift &&) = default;
-//
-//	xorshift(xorshift &) = default;
-//	xorshift & operator=(xorshift &) = default;
-//
-//	result_type operator()()
-//	{
-//		// varianta 1 z wiki
-//		//std::uint32_t x = m_state;
-//		//x ^= x << 13;
-//		//x ^= x >> 17;
-//		//x ^= x << 5;
-//		//m_state = x;
-//		//return x;
-//
-//		// varianta 2 z wiki
-//		//uint64_t x = m_state;
-//		//x ^= x >> 12; // a
-//		//x ^= x << 25; // b
-//		//x ^= x >> 27; // c
-//		//m_state = x;
-//		//return x * 0x2545F4914F6CDD1D;
-//
-//		// varianta 3 z wiki
-//		std::uint64_t x = m_state;
-//		std::uint64_t const y = m_state1;
-//		m_state = y;
-//		x ^= x << 23; // a
-//		m_state1 = x ^ y ^ (x >> 17) ^ (y >> 26); // b, c
-//		return m_state1 + y;
-//	}
-//
-//	static result_type min() noexcept
-//	{
-//		return 0;
-//	}
-//
-//	static result_type max() noexcept
-//	{
-//		return std::numeric_limits<result_type>::max();
-//	}
-//
-//private:
-//	std::uint64_t m_state;
-//	std::uint64_t m_state1;
-//};
+    auto time = 15s;
+    if (areas_count <= 20 && cities_count < 50)
+        time = 3s;
+    else if (areas_count <= 100 && cities_count < 200)
+        time = 5s;
 
-
-
-enum method_t
-{
-	SWAP,
-	REVERSE,
-	INSERT
-};
-
-inline double get_last_t(std::size_t cities)
-{
-	if (cities < 55)
-		return 0.005;
-
-	if (cities < 105)
-		return 0.002;
-
-	return 0.0005;
-}
-
-path_t solver(path_t path, std::mt19937 rng, path_t * result)
-//path_t solver(path_t path, xorshift rng, path_t * result)
-{
-	auto min_path = path;
-	auto min_cost = path.cost();
-
-	auto actual_cost = min_cost;
-
-	// Create uniform random generator for generating inner indexes in the path.
-	std::uniform_int_distribution<std::uint16_t> gen_idx(1, static_cast<std::uint16_t>(path.cities_count() - 2));
-
-	// Create uniform random generator for generating random numbers on std::uint32_t.
-	std::uniform_int_distribution<std::uint32_t> gen_uint32(0, std::numeric_limits<std::uint32_t>::max());
-
-	// Some constants for temperature computing.
-	auto Tn = /*g_config.iterations*/ 110 * 1000 * 1000;
-	auto exp_base = std::log(get_last_t(path.cities_count()));
-
-	double actual_T = 1.0;
-
-	unsigned int iter = 0;
-	while (g_continue_run)
-	{
-		++iter;
-
-		if (iter % 512 /*g_config.recomp_T*/ == 1)
-			actual_T = std::exp(exp_base * std::pow((double)iter / (double)Tn, 0.3));
-
-		// Randomly choose two indexes.
-		auto i = gen_idx(rng);
-		auto j = gen_idx(rng);
-
-		// Compute the best price.
-		method_t method;
-		auto cost_diff = std::numeric_limits<std::int32_t>::max();
-
-		//if (g_config.use_swap)
-		{
-			method = SWAP;
-			cost_diff = path.swap_cost_diff(i, j);
-		}
-
-		//if (g_config.use_reverse)
-		{
-			auto price = path.reverse_cost_diff(i, j);
-			if (price < cost_diff)
-			{
-				cost_diff = price;
-				method = REVERSE;
-			}
-		}
-
-		//if (g_config.use_insert)
-		{
-			auto price = path.insert_cost_diff(i, j);
-			if (price < cost_diff)
-			{
-				cost_diff = price;
-				method = INSERT;
-			}
-		}
-
-		// Accept? Better ways accept every time || worse only with some probability.
-		bool accept = true;
-		if (cost_diff > 0)
-		{
-			auto rnd = gen_uint32(rng);
-			auto log_max_int = std::log(std::numeric_limits<std::uint32_t>::max());
-
-			auto right = (-cost_diff / (actual_T * path_t::s_costs.get_max())) + log_max_int;
-			auto left = std::log(rnd);
-
-			if (left > right)
-			{
-				accept = false;
-			}
-		}
-
-		// If the new path should be accepted, save it.
-		if (accept)
-		{
-			switch (method)
-			{
-			case SWAP:    path.swap(i, j); break;
-			case REVERSE: path.reverse(i, j); break;
-			case INSERT:  path.insert(i, j); break;
-			}
-
-			actual_cost += cost_diff;
-
-			// If the actual path cost is the best one, save it.
-			if (actual_cost < min_cost)
-			{
-				min_path = path;
-				min_cost = actual_cost;
-			}
-		}
-	}
-
-	*result = min_path;
-	return min_path;
+    auto elapsed_time = std::chrono::high_resolution_clock::now() - g_start_time;
+    return std::thread([=]{ std::this_thread::sleep_for(time - elapsed_time - 50ms); g_continue_run = false; });
 }
 
 
-class task
+ //// Global config data.
+ //config g_config;
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+static std::vector<std::uint16_t> cities_names_to_cities_idx(const char * city_names, cities_map_t & cities_indexer)
 {
-public:
-	task(unsigned int idx, int cities, std::uint16_t start_city)
-		: m_idx(idx)
-		, m_rng(idx + 60 /*g_config.seed*/)
-		, m_path(cities, start_city)
-	{
-	}
+    // There must be at least one city.
+    int count = 1;
+    auto begin = city_names;
 
-	void start()
-	{
-		m_worker = std::thread(solver, m_path, m_rng, &m_path);
-	}
+    // Just an alloc optimization.
+    while (city_names[3] == ' ')
+    {
+        ++count;
+        city_names += 4;
+    }
 
-	void wait()
-	{
-		if (m_worker.joinable())
-			m_worker.join();
-	}
+    std::vector<std::uint16_t> ret;
+    ret.reserve(count);
 
-	const path_t * get_path_ptr() const
-	{
-		return & m_path;
-	}
+    // Add the cities.
+    city_names = begin;
+    for (int i = 0; i < count; ++i)
+    {
+        auto idx = cities_indexer.get_city_index(city_t(city_names));
+        ret.push_back(idx);
+        city_names += 4;
+    }
+    return ret;
+}
 
-private:
-	unsigned int m_idx;
-	std::thread  m_worker;
-	std::mt19937 m_rng;
-	//xorshift     m_rng;
-	path_t       m_path;
-};
+static void parse_input_data(cities_map_t & cities_indexer, std::vector<area_t> & areas_list, matrix<std::uint16_t> & costs_matrix)
+{
+    parser_t parser;
 
+    // Read number of locations and start city.
+    std::uint16_t areas_count;
+    char * tmp_str;
+    parser.parse_line(areas_count, tmp_str);
+
+    /*auto idx_start = */cities_indexer.get_city_index(city_t(tmp_str));
+
+    // Load areas.
+    areas_list.clear();
+    areas_list.reserve(areas_count + 1);
+    areas_list.push_back(area_t(std::vector<std::uint16_t>())); // dummy area
+    for (int i = 0; i < areas_count; ++i)
+    {
+        parser.read_line();
+        auto cities = cities_names_to_cities_idx(parser.read_line(), cities_indexer);
+
+        // Check if the area contains start_city.
+        const auto it = std::find(cities.cbegin(), cities.cend(), /*idx_start*/0);
+        if (it != cities.cend())
+        {
+            auto pos = std::distance(it, cities.cbegin());
+            // Replace dummy area.
+            areas_list[0] = area_t(std::move(cities));
+            std::swap(areas_list[0], areas_list[pos]);
+        }
+        else
+            areas_list.push_back(area_t(/*std::move(area_name),*/ std::move(cities)));
+    }
+
+    // Save all flights to the matrix.
+    costs_matrix.set_dim(static_cast<unsigned int>(cities_indexer.count()));
+    char * from, * to;
+    std::uint16_t day, price;
+    while (parser.parse_line(from, to, day, price))
+    {
+        auto idx_src = cities_indexer.get_city_index(city_t(from));
+        auto idx_dst = cities_indexer.get_city_index(city_t(to));
+
+        if (day)
+            costs_matrix.set(idx_src, idx_dst, day - 1, price);
+        else
+        {
+            auto count = cities_indexer.count();
+            for (std::uint16_t j = 0; j < count; ++j)
+                costs_matrix.set(idx_src, idx_dst, j, price);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 int main()
 {
-	// Set SIGTERM handler.
-	std::signal(SIGTERM, signal_handler);
+    // Create the holders of cities and areas [name <-> index] and price matrix.
+    cities_map_t cities_indexer;
+    std::vector<area_t> areas_list;
+    matrix<std::uint16_t> costs_matrix;
 
-	// Helper variables for line parsing.
-	char * from, * to;
-	std::uint16_t day, price;
+    parse_input_data(cities_indexer, areas_list, costs_matrix);
 
-	// Create the holder of cities map [name <-> index].
-	cities_map cities;
+    // Set timer to the end.
+    auto timeout = set_time_limit(cities_indexer.count(), areas_list.size());
 
-	// Create the stdin data reader.
-	io::CSVReader<4, io::trim_chars<>, io::no_quote_escape<' '>> in("x:\\kiwi\\data_300.txt", stdin);
+    // Generate a random path.
+    areapath_t path(std::move(areas_list), &cities_indexer, &costs_matrix);
 
-	// Save the start/end city.
-	in.read_row(from, to, day, price);
-	auto start_city = cities.get_city_index(from);
+    // Print the optimized path and the cost.
+    path.optimize();
+    path.print(std::cout);
 
-	// Save all flights to the matrix.
-	matrix<std::uint16_t> & costs_matrix = path_t::s_costs;
-	while (in.read_row(from, to, day, price))
-	{
-		auto idx_src = cities.get_city_index(from);
-		auto idx_dst = cities.get_city_index(to);
-
-		costs_matrix.set(idx_src, idx_dst, day, price);
-	}
-
-	//// Create random generator.
-	//std::mt19937 rng;
-
-	//// Generate the path between N cities.
-	//path_t init_path(cities.count(), start_city);
-
-	//// Optimize the path.
-	//auto path = solver(init_path, rng);
-
-	//// Print the path and the cost.
-	//path.print(std::cout, cities);
-
-	const int TASKS_NUM = 4;
-
-	task * tasks[TASKS_NUM];
-	for (unsigned int i = 0; i < TASKS_NUM; ++i)
-	{
-		tasks[i] = new task(i, (int)cities.count(), start_city);
-		tasks[i]->start();
-
-		//std::cout << "poustim: " << i << std::endl;
-	}
-
-	for (int i = 0; i < TASKS_NUM; ++i)
-	{
-		tasks[i]->wait();
-
-		//std::cout << "koncim: " << i << std::endl;
-		//std::cout << "cena:   " << tasks[i]->get_path_ptr()->cost() << std::endl;
-	}
-
-	const path_t * final_path = tasks[0]->get_path_ptr();
-	for (int i = 1; i < TASKS_NUM; ++i)
-	{
-		if (tasks[i]->get_path_ptr()->cost() < final_path->cost())
-			final_path = tasks[i]->get_path_ptr();
-	}
-
-	final_path->print(std::cout, cities);
-
-//	timeout.join();
+    timeout.join();
     return 0;
 }
-
